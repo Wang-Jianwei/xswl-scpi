@@ -11,6 +11,9 @@ namespace scpi {
 // 构造函数
 // ============================================================================
 
+/// 构造 Lexer
+/// @brief 从文本字符串构造词法分析器，将字符串数据复制到内部二进制缓冲
+/// @param input 输入字符串
 Lexer::Lexer(const std::string& input)
     : pos_(0)
     , line_(1)
@@ -24,8 +27,12 @@ Lexer::Lexer(const std::string& input)
     blockTerminator_ = [this](uint8_t b) { 
         return isDefaultBlockTerminator(b); 
     };
-}
+} 
 
+/// 构造 Lexer
+/// @brief 从二进制缓冲构造词法分析器（不做额外复制语义以外的处理）
+/// @param data 数据指针
+/// @param length 数据长度
 Lexer::Lexer(const uint8_t* data, size_t length)
     : pos_(0)
     , line_(1)
@@ -36,8 +43,11 @@ Lexer::Lexer(const uint8_t* data, size_t length)
     blockTerminator_ = [this](uint8_t b) { 
         return isDefaultBlockTerminator(b); 
     };
-}
+} 
 
+/// 构造 Lexer
+/// @brief 从字节向量构造词法分析器（复制向量数据）
+/// @param data 数据向量
 Lexer::Lexer(const std::vector<uint8_t>& data)
     : input_(data)
     , pos_(0)
@@ -48,20 +58,25 @@ Lexer::Lexer(const std::vector<uint8_t>& data)
     blockTerminator_ = [this](uint8_t b) { 
         return isDefaultBlockTerminator(b); 
     };
-}
+} 
 
 // ============================================================================
 // 基础操作
 // ============================================================================
 
+/// @brief 查看当前位置偏移处的字节但不消费
+/// @param offset 相对于当前 pos_ 的偏移
+/// @return 返回字节值；如果越界返回 0
 uint8_t Lexer::peek(size_t offset) const {
     size_t idx = pos_ + offset;
     if (idx >= input_.size()) {
         return 0;
     }
     return input_[idx];
-}
+}  
 
+/// @brief 消费并返回当前位置字节，同时更新位置/行/列信息
+/// @return 被消费的字节；若已到达末尾返回 0
 uint8_t Lexer::advance() {
     if (isAtEnd()) {
         return 0;
@@ -77,7 +92,7 @@ uint8_t Lexer::advance() {
     }
     
     return c;
-}
+}  
 
 bool Lexer::isAtEnd() const {
     return pos_ >= input_.size();
@@ -132,6 +147,8 @@ Token Lexer::errorToken(const std::string& message) {
 // Token 操作
 // ============================================================================
 
+/// @brief 获取并消费下一个 Token
+/// @return 下一个词法单元；若出错返回 ERROR Token，若到达末尾返回 END_OF_INPUT Token
 Token Lexer::nextToken() {
     // 如果有预读的 Token, 直接返回
     if (hasPeeked_) {
@@ -140,7 +157,7 @@ Token Lexer::nextToken() {
     }
     
     // 跳过空白
-    skipInlineWhitespace();
+    skipInlineWhitespace();  
     
     // 检查结束
     if (isAtEnd()) {
@@ -469,6 +486,9 @@ Token Lexer::readNumber() {
 // 字符串读取
 // ============================================================================
 
+/// @brief 读取以 quote 包裹的字符串字面量，支持成对重复 quote 转义
+/// @param quote 引号字符 ' 或 "
+/// @return STRING Token 或在未终止时返回 ERROR Token
 Token Lexer::readString(char quote) {
     size_t startPos = pos_;
     size_t startLine = line_;
@@ -477,7 +497,7 @@ Token Lexer::readString(char quote) {
     advance();  // consume opening quote
 
     std::string content;
-    bool terminated = false;
+    bool terminated = false;  
 
     while (!isAtEnd()) {
         uint8_t c = peek();
@@ -561,6 +581,8 @@ Token Lexer::readHashPrefixed() {
 // 块数据读取
 // ============================================================================
 
+/// @brief 读取定长块数据 #n[length]<data>
+/// 解析 n 字段、读取长度并返回 BLOCK_DATA Token
 Token Lexer::readBlockData() {
     size_t startPos = pos_ - 1;  // 包括 '#'
     size_t startLine = line_;
@@ -569,7 +591,7 @@ Token Lexer::readBlockData() {
     // 读取 n (1-9)
     if (isAtEnd() || !utils::isDigit(peek())) {
         return errorToken("Expected digit after '#' for block data");
-    }
+    }  
     
     int n = peek() - '0';
     advance();
@@ -626,6 +648,8 @@ Token Lexer::readBlockData() {
     return Token::makeBlockData(data, false, startPos, startLine, startCol, totalLen);
 }
 
+/// @brief 读取不定长块数据 #0<data>，直到由 block terminator 指定的终止字节
+/// @return BLOCK_DATA Token (isIndefinite = true)
 Token Lexer::readIndefiniteBlock() {
     size_t startPos = pos_ - 2;  // 包括 '#0'
     size_t startLine = line_;
@@ -635,7 +659,7 @@ Token Lexer::readIndefiniteBlock() {
     
     // 读取直到终止符
     while (!isAtEnd()) {
-        uint8_t byte = peek();
+        uint8_t byte = peek();  
         
         if (blockTerminator_ && blockTerminator_(byte)) {
             break;
@@ -653,10 +677,11 @@ Token Lexer::readIndefiniteBlock() {
 // 进制字面量读取
 // ============================================================================
 
+/// @brief 读取二进制字面量 #B10101 并转换为整数；对于过长或溢出的位串返回 ERROR
 Token Lexer::readBinaryLiteral() {
     size_t startPos = pos_ - 2;  // 包括 '#B'
     size_t startLine = line_;
-    size_t startCol = column_ - 2;
+    size_t startCol = column_ - 2;  
     
     std::string bits;
     while (!isAtEnd() && (peek() == '0' || peek() == '1')) {
@@ -667,10 +692,17 @@ Token Lexer::readBinaryLiteral() {
         return errorToken("Expected binary digits after #B");
     }
     
-    // 转换为整数
+    // 保护性检查：避免非常长的二进制串导致解析性能问题或溢出
+    // 使用 std::stoll(bits, nullptr, 2) 来解析并捕获溢出异常
+    if (bits.length() > 63) {
+        return errorToken("Binary literal too long");
+    }
+
     int64_t value = 0;
-    for (char c : bits) {
-        value = (value << 1) | (c - '0');
+    try {
+        value = std::stoll(bits, nullptr, 2);
+    } catch (...) {
+        return errorToken("Binary number overflow or invalid binary literal");
     }
     
     Token token;
@@ -687,6 +719,7 @@ Token Lexer::readBinaryLiteral() {
     return token;
 }
 
+/// @brief 读取十六进制字面量 #H... 并转换为整数；溢出时返回 ERROR
 Token Lexer::readHexLiteral() {
     size_t startPos = pos_ - 2;  // 包括 '#H'
     size_t startLine = line_;
@@ -695,7 +728,7 @@ Token Lexer::readHexLiteral() {
     std::string hexDigits;
     while (!isAtEnd() && utils::isHexDigit(peek())) {
         hexDigits += static_cast<char>(advance());
-    }
+    }  
     
     if (hexDigits.empty()) {
         return errorToken("Expected hex digits after #H");
@@ -723,6 +756,7 @@ Token Lexer::readHexLiteral() {
     return token;
 }
 
+/// @brief 读取八进制字面量 #Q... 并转换为整数；溢出时返回 ERROR
 Token Lexer::readOctalLiteral() {
     size_t startPos = pos_ - 2;  // 包括 '#Q'
     size_t startLine = line_;

@@ -73,6 +73,7 @@ struct BlockData {
     
     /// 转换为字符串 (注意: 可能包含非打印字符)
     std::string toString() const {
+        if (data.empty()) return std::string();
         return std::string(reinterpret_cast<const char*>(data.data()), data.size());
     }
     

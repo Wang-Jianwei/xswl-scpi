@@ -389,6 +389,131 @@ static void testBlockDataInputAndOutput() {
     }
 }
 
+static void testBlockDataLargeTransfer() {
+    TEST("Phase5 - large block data upload/download (bounded to 1MB)") {
+        Parser p;
+        Context ctx;
+        std::vector<std::string> outs;
+        collectOutputs(ctx, outs);
+
+        p.registerDefaultSystemCommands();
+
+        // 上传端点：记录收到的数据和大小
+        size_t receivedSize = 0;
+        std::vector<uint8_t> receivedData;
+        p.registerCommand(":DATA:UPLoad", [&](Context& c)->int {
+            if (!c.params().hasBlockData(0)) {
+                c.pushStandardError(error::DATA_TYPE_ERROR);
+                return error::DATA_TYPE_ERROR;
+            }
+            receivedData = c.params().getBlockData(0);
+            receivedSize = receivedData.size();
+            return 0;
+        });
+
+        // 使用受控大小：1MB 或 MAX_BLOCK_DATA_SIZE（以较小者为准）来兼顾 CI
+        size_t S = std::min(constants::MAX_BLOCK_DATA_SIZE, static_cast<size_t>(1 * 1024 * 1024));
+        std::vector<uint8_t> payload(S);
+        for (size_t i = 0; i < S; ++i) payload[i] = static_cast<uint8_t>(i & 0xFF);
+
+        // 构造上传命令：#n[length]<data>
+        std::string dataStr(payload.begin(), payload.end());
+        std::string lenStr = std::to_string(S);
+        int n = static_cast<int>(lenStr.length());
+        ASSERT_TRUE(n >= 1 && n <= 9, "length digit count valid");
+
+        std::string cmd = std::string(":DATA:UPL #") + std::to_string(n) + lenStr + dataStr;
+        int rc = p.executeAll(cmd, ctx);
+        ASSERT_EQ(rc, 0, "large upload rc");
+        ASSERT_EQ(receivedSize, S, "large upload received size");
+        ASSERT_EQ(receivedData.size(), S, "large upload received size check");
+        ASSERT_EQ(std::string(reinterpret_cast<char*>(receivedData.data()), S), dataStr, "received content matches");
+
+        // 下载端点：返回相同 payload
+        p.registerQuery(":DATA:LARGE?", [&](Context& c)->int {
+            c.resultBlock(payload);
+            return 0;
+        });
+
+        outs.clear();
+        rc = p.executeAll(":DATA:LARGE?", ctx);
+        ASSERT_EQ(rc, 0, "large download rc");
+        ASSERT_EQ(outs.size(), (size_t)1, "large download output count");
+        const std::string& out = outs[0];
+        std::string expectedHeader = std::string("#") + std::to_string(n) + lenStr;
+        ASSERT_TRUE(startsWith(out, expectedHeader), "output header correct");
+        size_t headerLen = 2 + n;
+        ASSERT_EQ(out.size(), headerLen + S, "output total size");
+        std::string payloadOut = out.substr(headerLen);
+        ASSERT_EQ(payloadOut.size(), S, "payload size on output");
+        ASSERT_EQ(payloadOut, dataStr, "payload out content matches");
+
+        PASS();
+    } catch (const std::exception& e) {
+        FAIL(e.what());
+    }
+}
+
+static void testBlockDataTooLarge() {
+    TEST("Phase5 - block data too large rejected by lexer") {
+        // Use MAX_BLOCK_DATA_SIZE + 1 to trigger the "too large" branch without sending data
+        size_t S = constants::MAX_BLOCK_DATA_SIZE + 1;
+        std::string lenStr = std::to_string(S);
+        int n = static_cast<int>(lenStr.length());
+        ASSERT_TRUE(n >= 1 && n <= 9, "length digit count valid for MAX+1");
+
+        Lexer l(std::string("#") + std::to_string(n) + lenStr);
+        Token t = l.nextToken();
+        ASSERT_TRUE(t.is(TokenType::ERROR), "Lexer should produce ERROR for too large block");
+        ASSERT_TRUE(t.errorMessage.find("Block data too large") != std::string::npos, "Error message for too large");
+
+        PASS();
+    } catch (const std::exception& e) {
+        FAIL(e.what());
+    }
+}
+
+#ifdef RUN_SLOW_TESTS
+static void testBlockDataExtremeSuccess() {
+    TEST("Phase5 - block data extreme transfer (MAX_BLOCK_DATA_SIZE) - SLOW/LOCAL ONLY") {
+        Parser p;
+        Context ctx;
+        std::vector<std::string> outs;
+        collectOutputs(ctx, outs);
+
+        p.registerDefaultSystemCommands();
+
+        size_t S = constants::MAX_BLOCK_DATA_SIZE;
+        std::vector<uint8_t> payload(S);
+        for (size_t i = 0; i < S; ++i) payload[i] = static_cast<uint8_t>(i & 0xFF);
+
+        size_t received = 0;
+        p.registerCommand(":DATA:UPLoad", [&](Context& c)->int {
+            if (!c.params().hasBlockData(0)) {
+                c.pushStandardError(error::DATA_TYPE_ERROR);
+                return error::DATA_TYPE_ERROR;
+            }
+            received = c.params().getBlockData(0).size();
+            return 0;
+        });
+
+        std::string lenStr = std::to_string(S);
+        int n = static_cast<int>(lenStr.length());
+        ASSERT_TRUE(n >= 1 && n <= 9, "length digit count valid for MAX");
+
+        std::string dataStr(payload.begin(), payload.end());
+        std::string cmd = std::string(":DATA:UPL #") + std::to_string(n) + lenStr + dataStr;
+        int rc = p.executeAll(cmd, ctx);
+        ASSERT_EQ(rc, 0, "extreme upload rc");
+        ASSERT_EQ(received, S, "extreme upload received size");
+
+        PASS();
+    } catch (const std::exception& e) {
+        FAIL(e.what());
+    }
+}
+#endif
+
 static void testNodeParamExtractionThroughParser() {
     TEST("Phase5 - node param extraction through Parser (MEAS<ch>)") {
         Parser p;
@@ -499,6 +624,11 @@ int main() {
     testErrorQueueOverflow();
     testUnitsKeywordsAndInfinityEndToEnd();
     testBlockDataInputAndOutput();
+    testBlockDataLargeTransfer();
+    testBlockDataTooLarge();
+#ifdef RUN_SLOW_TESTS
+    testBlockDataExtremeSuccess();
+#endif
     testNodeParamExtractionThroughParser();
     testQueryNotSupportedAndCommandNotSupported();
     testHandlerReturnsErrorGetsQueued();

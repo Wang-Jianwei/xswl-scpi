@@ -8,6 +8,7 @@ namespace scpi {
 // 构造与析构
 // ============================================================================
 
+/// @brief 构造函数，创建命令树并初始化根节点
 CommandTree::CommandTree()
     : root_(new CommandNode("ROOT", "ROOT")) {
 }
@@ -33,7 +34,11 @@ static size_t findTrailingOptionalStart(const std::vector<PatternNode>& nodes) {
 // ============================================================================
 // 内部辅助: 为末尾可选节点设置处理器
 // ============================================================================
-
+/// @brief 为末尾的可选节点链在所有可能的路径位置设置处理器（set 或 query）
+/// @param nodes 模式解析后的节点列表
+/// @param optionalStart 可选节点链的起始索引
+/// @param handler 要设置的处理器
+/// @param isQuery 是否为查询处理器
 void CommandTree::setHandlersForOptionalChain(
     const std::vector<PatternNode>& nodes,
     size_t optionalStart,
@@ -71,6 +76,10 @@ void CommandTree::setHandlersForOptionalChain(
 // 命令注册
 // ============================================================================
 
+/// @brief 注册一个设置命令到命令树
+/// @param pattern 命令模式字符串
+/// @param handler 处理函数
+/// @return 成功返回叶节点指针，失败返回 nullptr
 CommandNode* CommandTree::registerCommand(const std::string& pattern,
                                            CommandHandler handler) {
     std::vector<PatternNode> nodes;
@@ -105,6 +114,10 @@ CommandNode* CommandTree::registerCommand(const std::string& pattern,
     return leaf;
 }
 
+/// @brief 注册一个查询命令到命令树（保证以 '?' 结尾）
+/// @param pattern 命令模式
+/// @param handler 查询处理函数
+/// @return 成功返回叶节点指针，失败返回 nullptr
 CommandNode* CommandTree::registerQuery(const std::string& pattern,
                                           CommandHandler handler) {
     std::string pat = pattern;
@@ -146,6 +159,11 @@ CommandNode* CommandTree::registerQuery(const std::string& pattern,
     return leaf;
 }
 
+/// @brief 同时注册设置与查询处理器（如果需要会去掉末尾的 '?')
+/// @param pattern 命令模式
+/// @param setHandler 设置处理函数
+/// @param queryHandler 查询处理函数
+/// @return 成功返回叶节点指针，失败返回 nullptr
 CommandNode* CommandTree::registerBoth(const std::string& pattern,
                                         CommandHandler setHandler,
                                         CommandHandler queryHandler) {
@@ -194,6 +212,9 @@ CommandNode* CommandTree::registerBoth(const std::string& pattern,
 // 路径创建
 // ============================================================================
 
+/// @brief 确保从根（或当前）到给定节点序列的路径存在，必要时创建节点
+/// @param nodes 解析后的节点列表
+/// @return 指向叶节点的指针，失败返回 nullptr
 CommandNode* CommandTree::ensurePath(const std::vector<PatternNode>& nodes) {
     if (nodes.empty()) {
         lastError_ = "Empty node list";
@@ -234,12 +255,18 @@ CommandNode* CommandTree::ensurePath(const std::vector<PatternNode>& nodes) {
 // 通用命令
 // ============================================================================
 
+/// @brief 注册 IEEE-488 通用命令（以 '*' 开头）
+/// @param name 命令名
+/// @param handler 处理函数
 void CommandTree::registerCommonCommand(const std::string& name,
                                           CommandHandler handler) {
     std::string normalized = normalizeCommonName(name);
     commonCommands_[normalized] = handler;
 }
 
+/// @brief 查找通用命令的处理器
+/// @param name 命令名
+/// @return 找到则返回处理器，否则返回 nullptr
 CommandHandler CommandTree::findCommonCommand(const std::string& name) const {
     std::string normalized = normalizeCommonName(name);
     auto it = commonCommands_.find(normalized);
@@ -247,7 +274,7 @@ CommandHandler CommandTree::findCommonCommand(const std::string& name) const {
         return it->second;
     }
     return nullptr;
-}
+} 
 
 bool CommandTree::hasCommonCommand(const std::string& name) const {
     std::string normalized = normalizeCommonName(name);
@@ -269,6 +296,10 @@ std::string CommandTree::normalizeCommonName(const std::string& name) {
 // 节点查找
 // ============================================================================
 
+/// @brief 根据路径查找节点并可选提取节点参数
+/// @param path 路径节点名列表
+/// @param nodeParams [out] 可选参数收集器
+/// @return 找到的节点，失败返回 nullptr
 CommandNode* CommandTree::findNode(const std::vector<std::string>& path,
                                     NodeParamValues* nodeParams) const {
     if (path.empty()) {
@@ -276,7 +307,7 @@ CommandNode* CommandTree::findNode(const std::vector<std::string>& path,
     }
     
     CommandNode* current = root_.get();
-    
+
     for (const auto& name : path) {
         int32_t extractedValue = 0;
         CommandNode* child = current->findChild(name, &extractedValue);

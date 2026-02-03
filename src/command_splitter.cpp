@@ -7,11 +7,16 @@
 
 namespace scpi {
 
+/// @brief 构造函数，初始化解析器的错误状态
 CommandSplitter::CommandSplitter()
     : hasError_(false)
     , errorPosition_(0)
     , errorCode_(error::NO_ERROR) {}
 
+/// @brief 设置解析错误信息并记录位置
+/// @param code 错误码
+/// @param msg 错误消息
+/// @param pos 错误位置（字节偏移）
 void CommandSplitter::setError(int code, const std::string& msg, size_t pos) {
     hasError_ = true;
     errorCode_ = code;
@@ -19,6 +24,10 @@ void CommandSplitter::setError(int code, const std::string& msg, size_t pos) {
     errorPosition_ = pos;
 }
 
+/// @brief 将输入拆分为若干 ParsedCommand，并进行初步语法检查
+/// @param input 输入字符串
+/// @param commands [out] 拆分出的命令列表
+/// @return 成功返回 true，否则 false（并设置错误信息）
 bool CommandSplitter::split(const std::string& input, std::vector<ParsedCommand>& commands) {
     commands.clear();
     hasError_ = false;
@@ -62,6 +71,10 @@ bool CommandSplitter::split(const std::string& input, std::vector<ParsedCommand>
     return true;
 }
 
+/// @brief 解析并返回一条命令（包含头部与参数）
+/// @param lexer 用于获取 Token 的词法分析器
+/// @param cmd [out] 解析得到的命令
+/// @return 成功返回 true，否则 false
 bool CommandSplitter::parseOneCommand(Lexer& lexer, ParsedCommand& cmd) {
     Token t = lexer.peekToken();
     cmd.startPos = t.position;
@@ -85,6 +98,10 @@ bool CommandSplitter::parseOneCommand(Lexer& lexer, ParsedCommand& cmd) {
     return true;
 }
 
+/// @brief 解析命令头, 支持通用命令（*）与常规冒号分隔路径
+/// @param lexer 词法分析器
+/// @param cmd [out] 填充头部信息的 ParsedCommand
+/// @return 成功返回 true，否则 false
 bool CommandSplitter::parseHeader(Lexer& lexer, ParsedCommand& cmd) {
     Token t = lexer.peekToken();
 
@@ -187,6 +204,10 @@ bool CommandSplitter::areAdjacent(const Token& a, const Token& b) {
     return (a.position + a.length) == b.position;
 }
 
+/// @brief 解析命令的参数列表并将参数追加到 ParsedCommand
+/// @param lexer 词法分析器
+/// @param cmd [out] 要追加参数的 ParsedCommand
+/// @return 成功返回 true，否则 false
 bool CommandSplitter::parseParameters(Lexer& lexer, ParsedCommand& cmd) {
     // 参数直到 ';' / NEWLINE / END
     while (true) {
@@ -212,6 +233,10 @@ bool CommandSplitter::parseParameters(Lexer& lexer, ParsedCommand& cmd) {
     return true;
 }
 
+/// @brief 解析单个参数（数字、字符串、块数据、通道列表或标识符）
+/// @param lexer 词法分析器
+/// @param cmd [out] 参数将被添加到该命令的参数列表
+/// @return 成功返回 true，否则 false
 bool CommandSplitter::parseOneParameter(Lexer& lexer, ParsedCommand& cmd) {
     Token t = lexer.peekToken();
 
@@ -297,6 +322,10 @@ bool CommandSplitter::parseOneParameter(Lexer& lexer, ParsedCommand& cmd) {
     return false;
 }
 
+/// @brief 解析通道列表参数，如 (@1,2,5) 或 (@1:10)
+/// @param lexer 词法分析器
+/// @param outParam [out] 解析后的 Parameter
+/// @return 成功返回 true，否则 false
 bool CommandSplitter::parseChannelList(Lexer& lexer, Parameter& outParam) {
     // 期待： '(' '@' ... ')'
     Token lp = lexer.nextToken();

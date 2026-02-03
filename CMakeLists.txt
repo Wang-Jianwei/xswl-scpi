@@ -82,6 +82,9 @@ install(DIRECTORY include/scpi DESTINATION include)
 # 安装库
 install(TARGETS scpi_parser DESTINATION lib)
 
+# 示例程序
+add_subdirectory(examples)
+
 # 可选: 构建测试
 option(BUILD_TESTS "Build tests" ON)
 if(BUILD_TESTS)
@@ -89,3 +92,4 @@ if(BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+

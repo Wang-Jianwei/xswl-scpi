@@ -545,6 +545,29 @@ void testLexer() {
     } catch (...) {
         FAIL("Exception thrown");
     }
+
+    TEST("Lexer - Binary literal") {
+        Lexer lexer("#B10101");
+        Token t = lexer.nextToken();
+        ASSERT(t.is(TokenType::NUMBER), "Expected NUMBER");
+        ASSERT(static_cast<int64_t>(t.numberValue) == 21, "Wrong binary value");
+
+        PASS();
+    } catch (...) {
+        FAIL("Exception thrown");
+    }
+
+    TEST("Lexer - Binary literal overflow") {
+        std::string bits(100, '1');
+        std::string s = "#B" + bits;
+        Lexer lexer(s);
+        Token t = lexer.nextToken();
+        ASSERT(t.is(TokenType::ERROR), "Should be ERROR for overflow");
+
+        PASS();
+    } catch (...) {
+        FAIL("Exception thrown");
+    }
 }
 
 // ============================================================================

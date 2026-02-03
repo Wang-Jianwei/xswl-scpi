@@ -11,25 +11,37 @@ namespace scpi {
 // from ieee488_commands.cpp
 void registerIeee488CommonDefaults(Parser& p);
 
+/// @brief 判断字符串是否以 '?' 结尾
+/// @param s 输入字符串
+/// @return 若以 '?' 结尾返回 true，否则 false
 bool Parser::endsWithQuestionMark(const std::string& s) {
     return !s.empty() && s.back() == '?';
-}
+} 
 
+/// @brief 判断模式是否为 IEEE-488 通用命令（以 '*' 开头）
+/// @param s 输入模式字符串
+/// @return 若以 '*' 开头返回 true
 bool Parser::isCommonPattern(const std::string& s) {
     return !s.empty() && s[0] == '*';
-}
+} 
 
+/// @brief 去掉末尾的 '?'（若存在），返回新字符串
+/// @param s 输入字符串
+/// @return 去掉 '?' 后的字符串
 std::string Parser::stripTrailingQuestionMark(const std::string& s) {
     if (!s.empty() && s.back() == '?') {
         return s.substr(0, s.size() - 1);
     }
     return s;
-}
+} 
 
+/// @brief 确保字符串以 '?' 结尾（若没有则添加）
+/// @param s 输入字符串
+/// @return 以 '?' 结尾的字符串
 std::string Parser::ensureTrailingQuestionMark(const std::string& s) {
     if (!s.empty() && s.back() == '?') return s;
     return s + "?";
-}
+} 
 
 Parser::Parser()
     : autoResetContext_(true) {}
@@ -37,6 +49,10 @@ Parser::Parser()
 Parser::~Parser() = default;
 
 // 单 handler：按 pattern 是否以 ? 结尾决定 set/query
+/// @brief 自动根据 pattern 决定注册为 set 或 query，或注册为通用命令
+/// @param pattern 命令模式
+/// @param handler 处理函数
+/// @return 如果是树内命令返回对应 CommandNode，否则返回 nullptr
 CommandNode* Parser::registerAuto(const std::string& pattern,
                                   CommandHandler handler) {
     if (!handler) return nullptr;
@@ -45,7 +61,7 @@ CommandNode* Parser::registerAuto(const std::string& pattern,
     if (isCommonPattern(pattern)) {
         registerCommonCommand(pattern, std::move(handler));
         return nullptr; // common command 不在命令树里
-    }
+    } 
 
     // 普通命令：根据是否带 ? 决定 query / set
     if (endsWithQuestionMark(pattern)) {
@@ -55,6 +71,11 @@ CommandNode* Parser::registerAuto(const std::string& pattern,
 }
 
 // set+query：若两者都非空则同时注册，否则退化为单 handler 逻辑
+/// @brief 注册一对 set/query 处理器（若只有一方则降级为单 handler 逻辑）
+/// @param pattern 命令模式
+/// @param setHandler 设置处理函数
+/// @param queryHandler 查询处理函数
+/// @return 如果是树内命令返回对应 CommandNode，否则返回 nullptr
 CommandNode* Parser::registerAuto(const std::string& pattern,
                                   CommandHandler setHandler,
                                   CommandHandler queryHandler) {
@@ -112,6 +133,7 @@ void Parser::registerDefaultCommonCommands() {
     registerIeee488CommonDefaults(*this);
 }
 
+/// @brief 注册默认的系统级命令（如 :SYSTem:ERRor? 等）到命令树中
 void Parser::registerDefaultSystemCommands() {
     // :SYST:ERR? / :SYST:ERR:NEXT?
     registerQuery(":SYSTem:ERRor?", [](Context& ctx) -> int {
@@ -158,6 +180,10 @@ void Parser::resetContext() {
     pathContext_.reset();
 }
 
+/// @brief 执行单条命令（若包含分号可包含多条，通常通过 executeAll 解析）
+/// @param input 输入命令字符串
+/// @param ctx 执行上下文
+/// @return 返回最后的错误码（0 表示成功）
 int Parser::execute(const std::string& input, Context& ctx) {
     // 检查输入长度
     if (input.length() > constants::MAX_INPUT_SIZE) {
@@ -256,6 +282,10 @@ int Parser::executeResolved(const ParsedCommand& cmd, const ResolveResult& rr, C
     return rc;
 }
 
+/// @brief 将输入拆分并按顺序执行每条解析出的命令
+/// @param input 输入命令字符串（可能包含多个由 ';' 分隔的命令）
+/// @param ctx 执行上下文
+/// @return 最后一个非零的错误码（若所有命令成功返回 0）
 int Parser::executeAll(const std::string& input, Context& ctx) {
     // 检查输入长度 (如果是直接调用 executeAll)
     if (input.length() > constants::MAX_INPUT_SIZE) {

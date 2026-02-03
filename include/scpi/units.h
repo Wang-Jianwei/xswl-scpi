@@ -145,9 +145,8 @@ public:
     
     /// 解析 SI 前缀字符
     /// @param c 前缀字符
-    /// @param isUnitStart 是否是单位的开始 (用于区分 M vs m)
     /// @return SI 前缀
-    static SiPrefix parsePrefixChar(char c, bool isUnitStart);
+    static SiPrefix parsePrefixChar(char c);
     
     // ========================================================================
     // 单位方法

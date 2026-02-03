@@ -227,6 +227,67 @@ static void testSplitterChannelList() {
     }
 }
 
+static void testSplitterBlockDataErrors() {
+    TEST("Phase4 - Splitter block data error cases") {
+        // 1) CommandSplitter: block too large should fail
+        {
+            CommandSplitter sp;
+            std::vector<ParsedCommand> cmds;
+            bool ok = sp.split(":DATA:UPL #9999999999", cmds);
+            ASSERT_TRUE(!ok, "split should fail for block too large");
+            ASSERT_TRUE(sp.hasError(), "split should set error");
+        }
+
+        // 2) CommandSplitter: truncated block should fail
+        {
+            CommandSplitter sp;
+            std::vector<ParsedCommand> cmds;
+            bool ok = sp.split(":DATA:UPL #3305AB", cmds); // declares 305 bytes but only 2 provided
+            ASSERT_TRUE(!ok, "split should fail for truncated block");
+            ASSERT_TRUE(sp.hasError(), "split should set error");
+        }
+
+        // Lexer-level checks for precise error messages
+        {
+            Lexer l("#9999999999");
+            Token t = l.nextToken();
+            ASSERT_TRUE(t.is(TokenType::ERROR), "Lexer should produce ERROR for too large block");
+            ASSERT_TRUE(t.errorMessage.find("Block data too large") != std::string::npos, "Error message for too large");
+        }
+
+        {
+            Lexer l("#3305AB");
+            Token t = l.nextToken();
+            ASSERT_TRUE(t.is(TokenType::ERROR), "Lexer should produce ERROR for truncated block");
+            ASSERT_TRUE(t.errorMessage.find("Block data truncated") != std::string::npos, "Error message for truncated block");
+        }
+
+        // Invalid length field (non-digit in length)
+        {
+            Lexer l("#3A5");
+            Token t = l.nextToken();
+            ASSERT_TRUE(t.is(TokenType::ERROR), "Lexer should produce ERROR for invalid length field");
+            ASSERT_TRUE(t.errorMessage.find("Expected digit in block data length field") != std::string::npos,
+                   "Expected digit error");
+        }
+
+        // Indefinite block parsing via splitter (should succeed and capture block data)
+        {
+            CommandSplitter sp;
+            std::vector<ParsedCommand> cmds;
+            ASSERT_TRUE(sp.split(":DATA:UPL #0ABC\n", cmds), "split indefinite block failed");
+            ASSERT_EQ(cmds.size(), (size_t)1, "cmd count");
+            ASSERT_EQ(cmds[0].params.size(), (size_t)1, "param count");
+            ASSERT_TRUE(cmds[0].params.at(0).isBlockData(), "param should be block data");
+            ASSERT_EQ(cmds[0].params.at(0).blockSize(), (size_t)3, "block size should be 3");
+        }
+
+        PASS();
+    } catch (const std::exception& e) {
+        FAIL(e.what());
+    }
+}
+
 static void testResolverAbsoluteRelativeAndContext() {
     TEST("Phase4 - Resolver absolute/relative and PathContext update") {
         CommandTree tree;
@@ -443,6 +504,7 @@ int main() {
     testSplitterBasicMultiCommand();
     testSplitterUnitsKeywordsAndInf();
     testSplitterBlockDataAndBases();
+    testSplitterBlockDataErrors();
     testSplitterChannelList();
     testResolverAbsoluteRelativeAndContext();
     testResolverOptionalNodesEpsilon();

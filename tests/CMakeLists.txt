@@ -41,8 +41,33 @@ set_tests_properties(TestPhase6 PROPERTIES LABELS "phase6")
 add_executable(easy_demo_phase5 demo_phase5.cpp)
 target_link_libraries(easy_demo_phase5 scpi_parser)
 
+# Optional: lightweight example tests (can be disabled)
+option(RUN_EXAMPLE_TESTS "Run lightweight example tests" ON)
+if(RUN_EXAMPLE_TESTS)
+    # Register example executables as tests
+    add_test(NAME ExampleBasicUsage COMMAND $<TARGET_FILE:easy_basic_usage>)
+    set_tests_properties(ExampleBasicUsage PROPERTIES LABELS "examples")
+
+    add_test(NAME ExampleSignalGenerator COMMAND $<TARGET_FILE:easy_signal_generator>)
+    set_tests_properties(ExampleSignalGenerator PROPERTIES LABELS "examples")
+
+    add_test(NAME ExampleOscilloscope COMMAND $<TARGET_FILE:easy_oscilloscope>)
+    set_tests_properties(ExampleOscilloscope PROPERTIES LABELS "examples")
+
+    add_test(NAME ExampleDMM COMMAND $<TARGET_FILE:easy_multichannel_dmm>)
+    set_tests_properties(ExampleDMM PROPERTIES LABELS "examples")
+
+    add_test(NAME ExampleCustomInstrument COMMAND $<TARGET_FILE:easy_custom_instrument>)
+    set_tests_properties(ExampleCustomInstrument PROPERTIES LABELS "examples")
+endif()
+
 # Convenience target to run all tests from build system
 add_custom_target(check
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
     DEPENDS easy_test_phase2 easy_test_phase3 easy_test_phase4 easy_test_phase5 easy_test_phase6
 )
+
+# Add example executables as dependencies of 'check' when enabled
+if(RUN_EXAMPLE_TESTS)
+    add_dependencies(check easy_basic_usage easy_signal_generator easy_oscilloscope easy_multichannel_dmm easy_custom_instrument)
+endif()

@@ -1,9 +1,7 @@
 // src/units.cpp
 #include "scpi/units.h"
-#include <cstring>
 #include <sstream>
 #include <iomanip>
-#include <cstdlib>
 
 namespace scpi {
 
@@ -11,6 +9,9 @@ namespace scpi {
 // 倍率方法
 // ============================================================================
 
+/// @brief 获取 SI 前缀的倍率值。
+/// @param prefix SI 前缀
+/// @return 倍率值（例如 KILO -> 1e3）
 double UnitParser::getMultiplier(SiPrefix prefix) {
     switch (prefix) {
         case SiPrefix::FEMTO:   return 1e-15;
@@ -27,7 +28,10 @@ double UnitParser::getMultiplier(SiPrefix prefix) {
     }
 }
 
-SiPrefix UnitParser::parsePrefixChar(char c, bool isUnitStart) {
+/// @brief 将单字符前缀解析为 SiPrefix 枚举。
+/// @param c 前缀字符（如 'k','M','m'）
+/// @return 对应的 SiPrefix，未知字符返回 SiPrefix::NONE
+SiPrefix UnitParser::parsePrefixChar(char c) {
         switch (c) {
         case 'T':               return SiPrefix::TERA;
         case 'G':               return SiPrefix::GIGA;
@@ -51,6 +55,9 @@ SiPrefix UnitParser::parsePrefixChar(char c, bool isUnitStart) {
 // 单位方法
 // ============================================================================
 
+/// @brief 将单位字符串解析为 BaseUnit 枚举。
+/// @param str 单位字符串（可为各种变体，如 "V"、"volt" 等）
+/// @return 对应的 BaseUnit；无法识别返回 BaseUnit::NONE
 BaseUnit UnitParser::parseBaseUnit(const std::string& str) {
     if (str.empty()) {
         return BaseUnit::NONE;
@@ -119,6 +126,9 @@ BaseUnit UnitParser::parseBaseUnit(const std::string& str) {
     return BaseUnit::NONE;
 }
 
+/// @brief 将 BaseUnit 转换为其标准字符串表示（短形式）。
+/// @param unit 基础单位
+/// @return 单位的字符串（字面量）
 const char* UnitParser::unitToString(BaseUnit unit) {
     switch (unit) {
         case BaseUnit::NONE:        return "";
@@ -142,6 +152,9 @@ const char* UnitParser::unitToString(BaseUnit unit) {
     }
 }
 
+/// @brief 将 SiPrefix 转换为其单字符字符串表示。
+/// @param prefix SI 前缀
+/// @return 前缀字符的字符串（字面量），NONE 返回空串
 const char* UnitParser::prefixToString(SiPrefix prefix) {
     switch (prefix) {
         case SiPrefix::FEMTO:   return "f";
@@ -162,6 +175,11 @@ const char* UnitParser::prefixToString(SiPrefix prefix) {
 // 解析方法
 // ============================================================================
 
+/// @brief 解析单位后缀为前缀与基础单位（例如 "mV" -> milli, volt）
+/// @param suffix 后缀字符串（不含数值部分）
+/// @param prefix [out] 解析出的 SI 前缀
+/// @param unit [out] 解析出的基础单位
+/// @return 是否成功解析
 bool UnitParser::parseUnitSuffix(const std::string& suffix,
                                   SiPrefix& prefix,
                                   BaseUnit& unit) {
@@ -209,8 +227,8 @@ bool UnitParser::parseUnitSuffix(const std::string& suffix,
                 prefix = SiPrefix::MEGA;
             } else {
                 // 其他前缀 (k, u, n, p, f, etc.)
-                // 这里 isUnitStart 参数不再重要，因为我们已经确认后面是单位了
-                prefix = parsePrefixChar(originalPrefixChar, true);
+                // 这里不需要额外上下文参数，直接解析前缀字符
+                prefix = parsePrefixChar(originalPrefixChar);
             }
             
             // 验证前缀是否有效
@@ -233,6 +251,10 @@ bool UnitParser::parseUnitSuffix(const std::string& suffix,
     return false;
 }
 
+/// @brief 解析带单位的数值字符串（例如 "3.3mV" 或 "100MHz"）
+/// @param input 输入字符串
+/// @param result [out] 解析结果（rawValue, prefix, unit 等）
+/// @return 是否解析成功
 bool UnitParser::parse(const std::string& input, UnitValue& result) {
     result = UnitValue();
     
@@ -310,6 +332,9 @@ bool UnitParser::parse(const std::string& input, UnitValue& result) {
 // 格式化方法
 // ============================================================================
 
+/// @brief 根据数值大小选择最合适的 SI 前缀以便显示
+/// @param value 原始数值
+/// @return 选定的 SiPrefix
 SiPrefix UnitParser::selectBestPrefix(double value) {
     if (value == 0) {
         return SiPrefix::NONE;
@@ -330,6 +355,11 @@ SiPrefix UnitParser::selectBestPrefix(double value) {
     return SiPrefix::FEMTO;
 }
 
+/// @brief 将数值格式化为带单位的字符串（可选自动选择前缀）
+/// @param value 数值（以基础单位为基准）
+/// @param unit 基础单位
+/// @param usePrefix 是否启用自动前缀选择
+/// @return 格式化后的字符串（例如 "100mV"）
 std::string UnitParser::format(double value, BaseUnit unit, bool usePrefix) {
     std::ostringstream oss;
     
