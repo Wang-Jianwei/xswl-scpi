@@ -85,34 +85,7 @@ install(TARGETS scpi_parser DESTINATION lib)
 # 可选: 构建测试
 option(BUILD_TESTS "Build tests" ON)
 if(BUILD_TESTS)
+    include(CTest)
     enable_testing()
-    
-    # Phase 2 测试
-    add_executable(test_phase2 tests/test_phase2.cpp)
-    target_link_libraries(test_phase2 scpi_parser)
-    add_test(NAME TestPhase2 COMMAND test_phase2)
-    
-    # Phase 3 测试
-    add_executable(test_phase3 tests/test_phase3.cpp)
-    target_link_libraries(test_phase3 scpi_parser)
-    add_test(NAME TestPhase3 COMMAND test_phase3)
-
-    # Phase 4 测试
-    add_executable(test_phase4 tests/test_phase4.cpp)
-    target_link_libraries(test_phase4 scpi_parser)
-    add_test(NAME TestPhase4 COMMAND test_phase4)
-
-    # Phase 5 测试
-    add_executable(test_phase5 tests/test_phase5.cpp)
-    target_link_libraries(test_phase5 scpi_parser)
-    add_test(NAME TestPhase5 COMMAND test_phase5)
-    
-    # Phase 6 测试
-    add_executable(test_phase6 tests/test_phase6.cpp)
-    target_link_libraries(test_phase6 scpi_parser)
-    add_test(NAME TestPhase6 COMMAND test_phase6)
-
-    # Phase 5 demo
-    add_executable(demo_phase5 tests/demo_phase5.cpp)
-    target_link_libraries(demo_phase5 scpi_parser)
+    add_subdirectory(tests)
 endif()
