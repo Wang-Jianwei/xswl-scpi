@@ -70,7 +70,6 @@ cmake --build build --config Release --target easy_basic_usage
 > cmake -S . -B build -DBUILD_TESTS=ON -DRUN_EXAMPLE_TESTS=OFF
 > ```
 
-
 示例说明：
 
 - `easy_basic_usage` — 最小示例，展示命令注册、回调与缓冲响应的两种使用方式。
@@ -78,8 +77,6 @@ cmake --build build --config Release --target easy_basic_usage
 - `easy_oscilloscope` — 返回二进制块数据（float 数组），并展示如何解析接收到的块数据。
 - `easy_multichannel_dmm` — 演示带通道的路径模式与如何从上下文读取通道参数（`ctx.nodeParamOf("CH")`）。
 - `easy_custom_instrument` — 展示覆盖通用命令（如 `*IDN?`）并返回自定义识别字符串。
-
-
 
 ---
 
@@ -130,6 +127,87 @@ int main() {
 ```
 
 更多使用范例请查看 `examples/` 目录（包含示波器、信号发生器、DMM 等示例）。
+
+---
+
+## 关键 API 说明 🔧
+
+下面列出项目中常用且对集成最有帮助的 API，以便快速查阅：
+
+### Parser（命令注册与执行）
+
+- `Parser::registerAuto(pattern, handler)`
+  - 自动根据 `pattern` 是否以 `?` 结尾注册为 set 或 query。若 `pattern` 以 `*` 开头则注册为通用命令（返回 `nullptr`）。
+  - 返回：对树内命令返回 `CommandNode*`，便于后续设置子节点或 handler；通用命令返回 `nullptr`。
+
+- `Parser::registerCommand(pattern, handler)` / `Parser::registerQuery(pattern, handler)` / `Parser::registerBoth(pattern, setHandler, queryHandler)`
+  - 显式注册 set / query / set+query（`registerBoth` 会处理末尾 `?`）。
+
+- `Parser::registerDefaultCommonCommands()` / `Parser::registerDefaultSystemCommands()`
+  - 注册 IEEE-488 常用命令（如 `*IDN?`）与系统级命令（如 `:SYST:ERR?`）。
+
+- `Parser::execute(input, ctx)` / `Parser::executeAll(input, ctx)`
+  - 执行输入命令字符串；返回最后一个非零错误码（0 表示全部成功）。
+  - `execute` 会在每次调用时根据 `autoResetContext_` 重置路径上下文；`executeAll` 可执行分号分隔的多条命令。
+
+- `Parser::resetContext()` / `Parser::setAutoResetContext(bool)`
+  - 手动重置路径上下文或设置自动重置行为。
+
+### Context（执行时的状态与 I/O）
+
+- 输出相关：
+  - `setOutputCallback(OutputCallback)`：设置文本输出回调（立即发送响应）。
+  - `setBinaryOutputCallback(BinaryOutputCallback)`：设置二进制输出回调。
+  - `result(...)`：发送文本/数值响应；若未设置回调则缓冲响应，后续可用 `popTextResponse()` / `popBinaryResponse()` 读取。
+  - `resultBlock(...)` / `resultBlockArray(...)`：发送块数据（#<n><len><data>）。
+
+- 错误相关：
+  - `pushError(code, message)`、`pushStandardError(code)`：将错误入队并同步 ESR。
+  - `errorQueue()`：访问 `ErrorQueue`（查看、弹出或计数错误）。
+
+- 参数与路径：
+  - `params()` / `nodeParams()`：访问解析出的参数列表与节点参数（路径参数，例如通道号）。
+  - `nodeParamOf("NAME")`：按节点名读取捕获到的路径参数。
+
+- 其它：
+  - `setByteOrder(ByteOrder)`：设置发送/接收数组的字节序。
+  - `setUserData(void*)`：将用户数据指针绑定到上下文中供 handler 使用。
+
+### Parameter / ParameterList（参数读取与类型安全）
+
+- `ParameterList::getDouble(index, default)` / `getScaledDouble(index, default)`
+  - 读取数值参数并自动应用单位前缀（如 `1kHz` -> `1000`）。
+
+- `getAsUnit(index, SiPrefix, default)`
+  - 将参数转换为指定单位前缀（便于统一输出单位）。
+
+- `hasBlockData(index)` / `getBlockData(index)`
+  - 检测与读取块数据参数（返回字节数组引用）。
+
+- `isKeyword(index)` / `isMin(index)` / `isMax(index)` / `isDef(index)`
+  - 检测数值关键字（如 `MINimum`, `MAXimum`, `DEFault` 等）。
+
+### 示例（注册 + 执行 + 参数读取）
+
+```cpp
+Parser parser;
+parser.registerAuto(":SOUR:FREQ", [](Context& ctx){
+    if (ctx.isQuery()) {
+        ctx.result(1000);
+    } else {
+        double hz = ctx.params().getScaledDouble(0, 0.0);
+        // 处理设置...
+        ctx.result("OK");
+    }
+    return 0;
+});
+
+Context ctx;
+ctx.setOutputCallback([](const std::string &s){ std::cout << "RESP: " << s << std::endl; });
+parser.executeAll(":SOUR:FREQ 1kHz;:SOUR:FREQ?", ctx);
+```
+
+> 小贴士：若在 CI 或受限环境中运行测试，`RUN_EXAMPLE_TESTS` 可以用于控制是否包含示例作为测试项（参见顶层 `CMakeLists.txt` 与 `tests/CMakeLists.txt`）。
 
 ---
 

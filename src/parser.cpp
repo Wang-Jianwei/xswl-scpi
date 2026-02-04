@@ -43,9 +43,17 @@ std::string Parser::ensureTrailingQuestionMark(const std::string& s) {
     return s + "?";
 } 
 
+/**
+ * @brief 构造函数：初始化 Parser
+ *
+ * 默认启用 autoResetContext_（每次执行后自动重置路径上下文）。
+ */
 Parser::Parser()
     : autoResetContext_(true) {}
 
+/**
+ * @brief 析构函数
+ */
 Parser::~Parser() = default;
 
 // 单 handler：按 pattern 是否以 ? 结尾决定 set/query
@@ -113,22 +121,51 @@ CommandNode* Parser::registerAuto(const std::string& pattern,
     return nullptr;
 }
 
+/**
+ * @brief 在命令树中注册一个 "set"（非查询）命令
+ * @param pattern 命令模式（短/长形式，末尾不应带 '?')
+ * @param handler 对应的命令处理回调
+ * @return 返回对应的 CommandNode*（用于进一步操作），或 nullptr
+ */
 CommandNode* Parser::registerCommand(const std::string& pattern, CommandHandler handler) {
     return tree_.registerCommand(pattern, std::move(handler));
 }
 
+/**
+ * @brief 在命令树中注册一个 "query"（以 '?' 结尾）命令
+ * @param pattern 命令模式（应以 '?' 结尾）
+ * @param handler 对应的查询处理回调
+ * @return 返回对应的 CommandNode*（用于进一步操作），或 nullptr
+ */
 CommandNode* Parser::registerQuery(const std::string& pattern, CommandHandler handler) {
     return tree_.registerQuery(pattern, std::move(handler));
 }
 
+/**
+ * @brief 同时注册 set 与 query 两个处理器到同一模式下
+ * @param pattern 命令模式（末尾可带或不带 '?'，内部会处理）
+ * @param setHandler 设置处理回调
+ * @param queryHandler 查询处理回调
+ * @return 返回对应的 CommandNode*（用于 set 版本），或 nullptr
+ */
 CommandNode* Parser::registerBoth(const std::string& pattern, CommandHandler setHandler, CommandHandler queryHandler) {
     return tree_.registerBoth(pattern, std::move(setHandler), std::move(queryHandler));
 }
 
+/**
+ * @brief 注册一个 IEEE-488 通用命令（例如 *IDN? / *RST）
+ * @param name 通用命令名称（可以带或不带 '?'，内部会区分）
+ * @param handler 命令处理回调
+ */
 void Parser::registerCommonCommand(const std::string& name, CommandHandler handler) {
     tree_.registerCommonCommand(name, std::move(handler));
 }
 
+/**
+ * @brief 注册库自带的 IEEE-488 通用命令（封装到 helper 中）
+ *
+ * 该函数会调用位于 ieee488_commands.cpp 中的注册函数。
+ */
 void Parser::registerDefaultCommonCommands() {
     registerIeee488CommonDefaults(*this);
 }
@@ -176,6 +213,12 @@ void Parser::registerDefaultSystemCommands() {
     });
 }
 
+/**
+ * @brief 手动重置 Parser 的路径上下文（等价于回到根节点）
+ *
+ * 通常由用户在需要跨会话或手动管理上下文时调用。解析/执行函数
+ * 在 autoResetContext_ 为 true 时会自动调用本方法。
+ */
 void Parser::resetContext() {
     pathContext_.reset();
 }
@@ -199,6 +242,11 @@ int Parser::execute(const std::string& input, Context& ctx) {
     return executeAll(input, ctx);
 }
 
+/**
+ * @brief 规范化 handler 返回值为库约定的 SCPI 错误码范围
+ * @param rc handler 的原始返回值
+ * @return 规范化后的返回码（0 表示成功，其他值按 SCPI 约定）
+ */
 int Parser::normalizeHandlerReturn(int rc) {
     if (rc == 0) return 0;
 
@@ -209,6 +257,14 @@ int Parser::normalizeHandlerReturn(int rc) {
     return error::EXECUTION_ERROR;
 }
 
+/**
+ * @brief 在一次 resolve/执行后更新内部 PathContext 的当前位置
+ * @param cmd 已解析的命令
+ * @param rr resolve 的结果，包含 consumedPath 和 nodeParams 等信息
+ *
+ * 规则：当 consumedPath 有多层时，将上下文设为被消费路径的父节点；
+ * 当仅消费一层且原起点非根时保留起点；否则回到 ROOT（nullptr）。
+ */
 void Parser::updatePathContextAfterResolve(const ParsedCommand& cmd,
                                           const ResolveResult& rr) {
     // 基于 Phase4 测试中的规则：上下文停留在“消耗输入路径的父节点”
@@ -233,6 +289,13 @@ void Parser::updatePathContextAfterResolve(const ParsedCommand& cmd,
     pathContext_.setCurrent(newCtx);
 }
 
+/**
+ * @brief 执行已经解析并 resolve 成功的命令
+ * @param cmd 已解析的命令结构
+ * @param rr resolve 的结果（包含目标 node 或 common handler）
+ * @param ctx 执行上下文（会被填充 params/nodeParams 并用于调用 handler）
+ * @return handler 的返回码（已规范化）
+ */
 int Parser::executeResolved(const ParsedCommand& cmd, const ResolveResult& rr, Context& ctx) {
     // 每条命令执行前清空命令级状态（但不清错误队列）
     ctx.resetCommandState();

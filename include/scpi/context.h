@@ -64,6 +64,10 @@ public:
         resultBlockArray(arr.data(), arr.size());
     }
 
+    /// @brief 该模板成员函数将 $data$ 中的 $count$ 个元素逐个转换为目标字节序并序列化为字节数组，随后通过 resultBlock 输出。
+    /// @tparam T 
+    /// @param data 
+    /// @param count 
     template<typename T>
     void resultBlockArray(const T* data, size_t count) {
         std::vector<uint8_t> bytes;

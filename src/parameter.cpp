@@ -17,10 +17,17 @@ const std::vector<uint8_t> Parameter::emptyBlockData_;
 const UnitValue Parameter::emptyUnitValue_;
 const Parameter ParameterList::emptyParam_;
 
-// ============================================================================
-// 构造函数
-// ============================================================================
+/**
+ * ============================================================================
+ * 构造函数与拷贝/移动语义
+ * ============================================================================
+ */
 
+/**
+ * @brief 默认构造函数
+ *
+ * 初始化为 NONE 类型；数值/关键字/单元等成员设为默认值。
+ */
 Parameter::Parameter()
     : type_(ParameterType::NONE)
     , intValue_(0)
@@ -29,8 +36,15 @@ Parameter::Parameter()
     , keyword_(NumericKeyword::NONE) {
 }
 
+/**
+ * @brief 析构函数
+ */
 Parameter::~Parameter() = default;
 
+/**
+ * @brief 拷贝构造函数
+ * @param other 要拷贝的 Parameter
+ */
 Parameter::Parameter(const Parameter& other)
     : type_(other.type_)
     , intValue_(other.intValue_)
@@ -43,6 +57,10 @@ Parameter::Parameter(const Parameter& other)
     , blockData_(other.blockData_) {
 }
 
+/**
+ * @brief 移动构造函数
+ * @param other 要移动的 Parameter（移动后 other 置为 NONE）
+ */
 Parameter::Parameter(Parameter&& other) noexcept
     : type_(other.type_)
     , intValue_(other.intValue_)
@@ -56,6 +74,9 @@ Parameter::Parameter(Parameter&& other) noexcept
     other.type_ = ParameterType::NONE;
 }
 
+/**
+ * @brief 拷贝赋值运算符
+ */
 Parameter& Parameter::operator=(const Parameter& other) {
     if (this != &other) {
         type_ = other.type_;
@@ -71,6 +92,9 @@ Parameter& Parameter::operator=(const Parameter& other) {
     return *this;
 }
 
+/**
+ * @brief 移动赋值运算符
+ */
 Parameter& Parameter::operator=(Parameter&& other) noexcept {
     if (this != &other) {
         type_ = other.type_;
@@ -91,6 +115,10 @@ Parameter& Parameter::operator=(Parameter&& other) noexcept {
 // 工厂方法
 // ============================================================================
 
+/**
+ * @brief 从整数创建 Parameter
+ * @param value 整数值
+ */
 Parameter Parameter::fromInt(int64_t value) {
     Parameter p;
     p.type_ = ParameterType::INTEGER;
@@ -99,6 +127,10 @@ Parameter Parameter::fromInt(int64_t value) {
     return p;
 }
 
+/**
+ * @brief 从双精度浮点创建 Parameter
+ * @param value 浮点值
+ */
 Parameter Parameter::fromDouble(double value) {
     Parameter p;
     p.type_ = ParameterType::DOUBLE;
@@ -107,6 +139,9 @@ Parameter Parameter::fromDouble(double value) {
     return p;
 }
 
+/**
+ * @brief 从布尔值创建 Parameter
+ */
 Parameter Parameter::fromBoolean(bool value) {
     Parameter p;
     p.type_ = ParameterType::BOOLEAN;
@@ -116,6 +151,9 @@ Parameter Parameter::fromBoolean(bool value) {
     return p;
 }
 
+/**
+ * @brief 从字符串创建 Parameter（不尝试解析数值）
+ */
 Parameter Parameter::fromString(const std::string& value) {
     Parameter p;
     p.type_ = ParameterType::STRING;
@@ -123,6 +161,9 @@ Parameter Parameter::fromString(const std::string& value) {
     return p;
 }
 
+/**
+ * @brief 从标识符创建 Parameter（自动识别布尔/关键字/普通标识符）
+ */
 Parameter Parameter::fromIdentifier(const std::string& value) {
     Parameter p;
     
@@ -147,6 +188,9 @@ Parameter Parameter::fromIdentifier(const std::string& value) {
     return p;
 }
 
+/**
+ * @brief 从数值关键字创建 Parameter（如 MIN / MAX / DEF）
+ */
 Parameter Parameter::fromKeyword(NumericKeyword keyword) {
     Parameter p;
     p.type_ = ParameterType::NUMERIC_KEYWORD;
@@ -155,6 +199,9 @@ Parameter Parameter::fromKeyword(NumericKeyword keyword) {
     return p;
 }
 
+/**
+ * @brief 从 UnitValue 创建带单位的数值参数
+ */
 Parameter Parameter::fromUnitValue(const UnitValue& uv) {
     Parameter p;
     p.type_ = ParameterType::NUMERIC_WITH_UNIT;
@@ -164,11 +211,17 @@ Parameter Parameter::fromUnitValue(const UnitValue& uv) {
     return p;
 }
 
+/**
+ * @brief 从原始数值与前缀/单位创建带单位参数（便捷重载）
+ */
 Parameter Parameter::fromUnitValue(double rawValue, SiPrefix prefix, BaseUnit unit) {
     UnitValue uv(rawValue, prefix, unit);
     return fromUnitValue(uv);
 }
 
+/**
+ * @brief 从通道列表创建 Parameter（用于 @() 语法）
+ */
 Parameter Parameter::fromChannelList(const std::vector<int>& channels) {
     Parameter p;
     p.type_ = ParameterType::CHANNEL_LIST;
@@ -176,6 +229,9 @@ Parameter Parameter::fromChannelList(const std::vector<int>& channels) {
     return p;
 }
 
+/**
+ * @brief 从块数据创建 Parameter（拷贝）
+ */
 Parameter Parameter::fromBlockData(const std::vector<uint8_t>& data) {
     Parameter p;
     p.type_ = ParameterType::BLOCK_DATA;
@@ -183,6 +239,9 @@ Parameter Parameter::fromBlockData(const std::vector<uint8_t>& data) {
     return p;
 }
 
+/**
+ * @brief 从原始字节缓冲创建块数据参数
+ */
 Parameter Parameter::fromBlockData(const uint8_t* data, size_t length) {
     Parameter p;
     p.type_ = ParameterType::BLOCK_DATA;
@@ -190,6 +249,11 @@ Parameter Parameter::fromBlockData(const uint8_t* data, size_t length) {
     return p;
 }
 
+/**
+ * @brief 从词法 Token 创建 Parameter（常用入口）
+ * @param token 词法器产生的 Token
+ * @return 解析后的 Parameter（若解析失败返回类型 NONE 的 Parameter）
+ */
 Parameter Parameter::fromToken(const Token& token) {
     switch (token.type) {
         case TokenType::NUMBER:
@@ -223,6 +287,9 @@ Parameter Parameter::fromToken(const Token& token) {
 // 类型检查
 // ============================================================================
 
+/**
+ * @brief 判断参数是否为数值类型（整数/浮点/带单位/关键字）
+ */
 bool Parameter::isNumeric() const {
     switch (type_) {
         case ParameterType::INTEGER:
@@ -235,6 +302,9 @@ bool Parameter::isNumeric() const {
     }
 }
 
+/**
+ * @brief 若为数值关键字则返回对应的枚举，否则返回 NONE
+ */
 NumericKeyword Parameter::numericKeyword() const {
     if (type_ == ParameterType::NUMERIC_KEYWORD) {
         return keyword_;
@@ -246,6 +316,9 @@ NumericKeyword Parameter::numericKeyword() const {
 // 值获取 - 基础类型
 // ============================================================================
 
+/**
+ * @brief 转换为 32 位整数（带溢出保护）
+ */
 int32_t Parameter::toInt32(int32_t defaultValue) const {
     int64_t v = toInt64(defaultValue);
     if (v > INT32_MAX) return INT32_MAX;
@@ -253,6 +326,9 @@ int32_t Parameter::toInt32(int32_t defaultValue) const {
     return static_cast<int32_t>(v);
 }
 
+/**
+ * @brief 转换为 64 位整数，若无法转换返回 defaultValue
+ */
 int64_t Parameter::toInt64(int64_t defaultValue) const {
     switch (type_) {
         case ParameterType::INTEGER:
@@ -277,6 +353,9 @@ int64_t Parameter::toInt64(int64_t defaultValue) const {
     }
 }
 
+/**
+ * @brief 转换为双精度浮点，若无法转换返回 defaultValue
+ */
 double Parameter::toDouble(double defaultValue) const {
     switch (type_) {
         case ParameterType::INTEGER:
@@ -301,6 +380,9 @@ double Parameter::toDouble(double defaultValue) const {
     }
 }
 
+/**
+ * @brief 转换为布尔值，支持多种表示形式
+ */
 bool Parameter::toBool(bool defaultValue) const {
     switch (type_) {
         case ParameterType::BOOLEAN:
@@ -325,6 +407,9 @@ bool Parameter::toBool(bool defaultValue) const {
     }
 }
 
+/**
+ * @brief 以字符串形式返回参数的表达（用于调试/日志）
+ */
 std::string Parameter::toString() const {
     switch (type_) {
         case ParameterType::STRING:
@@ -368,6 +453,9 @@ std::string Parameter::toString() const {
 // 值获取 - 单位相关
 // ============================================================================
 
+/**
+ * @brief 获取内部的 UnitValue 引用（若类型不匹配返回空的 UnitValue）
+ */
 const UnitValue& Parameter::unitValue() const {
     if (type_ == ParameterType::NUMERIC_WITH_UNIT) {
         return unitValue_;
@@ -375,6 +463,9 @@ const UnitValue& Parameter::unitValue() const {
     return emptyUnitValue_;
 }
 
+/**
+ * @brief 将参数转换为基准单位（例如 Hz、V 等）
+ */
 double Parameter::toBaseUnit() const {
     if (type_ == ParameterType::NUMERIC_WITH_UNIT) {
         return unitValue_.scaledValue;
@@ -382,6 +473,9 @@ double Parameter::toBaseUnit() const {
     return toDouble();
 }
 
+/**
+ * @brief 返回未缩放的原始数值（如果有单位）
+ */
 double Parameter::rawValue() const {
     if (type_ == ParameterType::NUMERIC_WITH_UNIT) {
         return unitValue_.rawValue;
@@ -389,6 +483,9 @@ double Parameter::rawValue() const {
     return toDouble();
 }
 
+/**
+ * @brief 返回数值的 SI 前缀
+ */
 SiPrefix Parameter::siPrefix() const {
     if (type_ == ParameterType::NUMERIC_WITH_UNIT) {
         return unitValue_.prefix;
@@ -396,6 +493,9 @@ SiPrefix Parameter::siPrefix() const {
     return SiPrefix::NONE;
 }
 
+/**
+ * @brief 返回基础单位类型
+ */
 BaseUnit Parameter::baseUnit() const {
     if (type_ == ParameterType::NUMERIC_WITH_UNIT) {
         return unitValue_.unit;
@@ -403,6 +503,9 @@ BaseUnit Parameter::baseUnit() const {
     return BaseUnit::NONE;
 }
 
+/**
+ * @brief 返回单位的乘数（例如 k -> 1000）
+ */
 double Parameter::multiplier() const {
     if (type_ == ParameterType::NUMERIC_WITH_UNIT) {
         return unitValue_.multiplier;
@@ -410,6 +513,9 @@ double Parameter::multiplier() const {
     return 1.0;
 }
 
+/**
+ * @brief 将数值转换到指定的 SI 前缀表示
+ */
 double Parameter::toUnit(SiPrefix targetPrefix) const {
     double baseValue = toBaseUnit();
     double targetMult = UnitParser::getMultiplier(targetPrefix);
@@ -420,6 +526,12 @@ double Parameter::toUnit(SiPrefix targetPrefix) const {
 // 值获取 - 智能解析
 // ============================================================================
 
+/**
+ * @brief 针对数值关键字进行智能解析（如 MIN/MAX/DEF/INF/NAN）
+ * @param minVal MIN 对应值
+ * @param maxVal MAX 对应值
+ * @param defVal DEF 对应值
+ */
 double Parameter::toDoubleOr(double minVal, double maxVal, double defVal) const {
     if (type_ == ParameterType::NUMERIC_KEYWORD) {
         switch (keyword_) {
@@ -435,6 +547,9 @@ double Parameter::toDoubleOr(double minVal, double maxVal, double defVal) const 
     return toDouble(defVal);
 }
 
+/**
+ * @brief 使用回调解析数值关键字（resolver 用于根据 keyword 返回具体数值）
+ */
 double Parameter::resolveNumeric(
     std::function<double(NumericKeyword)> resolver,
     double defaultValue) const {
@@ -449,6 +564,9 @@ double Parameter::resolveNumeric(
 // 值获取 - 复合类型
 // ============================================================================
 
+/**
+ * @brief 返回通道列表引用（若类型不匹配返回空引用）
+ */
 const std::vector<int>& Parameter::toChannelList() const {
     if (type_ == ParameterType::CHANNEL_LIST) {
         return channelList_;
@@ -456,6 +574,9 @@ const std::vector<int>& Parameter::toChannelList() const {
     return emptyChannelList_;
 }
 
+/**
+ * @brief 返回块数据引用（若类型不匹配返回空引用）
+ */
 const std::vector<uint8_t>& Parameter::toBlockData() const {
     if (type_ == ParameterType::BLOCK_DATA) {
         return blockData_;
@@ -463,10 +584,16 @@ const std::vector<uint8_t>& Parameter::toBlockData() const {
     return emptyBlockData_;
 }
 
+/**
+ * @brief 返回块数据长度（字节数）
+ */
 size_t Parameter::blockSize() const {
     return (type_ == ParameterType::BLOCK_DATA) ? blockData_.size() : 0;
 }
 
+/**
+ * @brief 返回指向块数据字节的指针（若无数据返回 nullptr）
+ */
 const uint8_t* Parameter::blockBytes() const {
     if (type_ == ParameterType::BLOCK_DATA && !blockData_.empty()) {
         return blockData_.data();
@@ -474,6 +601,9 @@ const uint8_t* Parameter::blockBytes() const {
     return nullptr;
 }
 
+/**
+ * @brief 将块数据转换为十六进制字符串表示（调试用）
+ */
 std::string Parameter::blockToHex() const {
     if (type_ != ParameterType::BLOCK_DATA) {
         return "";
@@ -495,6 +625,9 @@ std::string Parameter::blockToHex() const {
 // 调试
 // ============================================================================
 
+/**
+ * @brief 返回参数类型名称（用于调试）
+ */
 const char* Parameter::typeName() const {
     switch (type_) {
         case ParameterType::NONE:               return "NONE";
@@ -511,6 +644,9 @@ const char* Parameter::typeName() const {
     }
 }
 
+/**
+ * @brief 以可读形式返回参数内容（便于日志和调试）
+ */
 std::string Parameter::dump() const {
     std::ostringstream oss;
     oss << typeName() << "(";
@@ -558,14 +694,23 @@ std::string Parameter::dump() const {
 // ParameterList 实现
 // ============================================================================
 
+/**
+ * @brief 将参数加入列表（拷贝）
+ */
 void ParameterList::add(const Parameter& param) {
     params_.push_back(param);
 }
 
+/**
+ * @brief 将参数加入列表（移动）
+ */
 void ParameterList::add(Parameter&& param) {
     params_.push_back(std::move(param));
 }
 
+/**
+ * @brief 获取指定索引处的参数引用，越界时返回空参数引用
+ */
 const Parameter& ParameterList::at(size_t index) const {
     if (index < params_.size()) {
         return params_[index];
@@ -573,6 +718,9 @@ const Parameter& ParameterList::at(size_t index) const {
     return emptyParam_;
 }
 
+/**
+ * @brief 以常用类型安全方法读取参数
+ */
 int32_t ParameterList::getInt(size_t index, int32_t defaultValue) const {
     return at(index).toInt32(defaultValue);
 }
@@ -596,6 +744,9 @@ std::string ParameterList::getString(size_t index, const std::string& defaultVal
     return at(index).toString();
 }
 
+/**
+ * @brief 按基准单位读取数值（若参数带单位会自动换算到基准单位）
+ */
 double ParameterList::getScaledDouble(size_t index, double defaultValue) const {
     if (index >= params_.size()) {
         return defaultValue;
@@ -603,6 +754,9 @@ double ParameterList::getScaledDouble(size_t index, double defaultValue) const {
     return at(index).toBaseUnit();
 }
 
+/**
+ * @brief 将参数转换为指定的 SI 前缀单位并返回数值
+ */
 double ParameterList::getAsUnit(size_t index, SiPrefix targetPrefix, 
                                  double defaultValue) const {
     if (index >= params_.size()) {
@@ -611,6 +765,9 @@ double ParameterList::getAsUnit(size_t index, SiPrefix targetPrefix,
     return at(index).toUnit(targetPrefix);
 }
 
+/**
+ * @brief 按范围读取数值参数，并支持关键字解析（MIN/MAX/DEF）
+ */
 double ParameterList::getNumeric(size_t index, double minVal, 
                                   double maxVal, double defVal) const {
     if (index >= params_.size()) {
@@ -657,5 +814,4 @@ bool ParameterList::isMax(size_t index) const {
 bool ParameterList::isDef(size_t index) const {
     return index < params_.size() && params_[index].isDef();
 }
-
 } // namespace scpi
